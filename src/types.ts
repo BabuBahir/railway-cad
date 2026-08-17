@@ -4,44 +4,58 @@ export interface SceneState {
   time: number;
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
+  camera: Camera;
 }
 
-export interface Cloud {
+export interface Camera {
+  zoom: number;
+  offsetX: number;
+  offsetY: number;
+}
+
+export interface Point {
   x: number;
   y: number;
-  w: number;
-  h: number;
-  speed: number;
-  opacity: number;
 }
 
-export interface Building {
-  x: number;
-  w: number;
-  h: number;
-  roofH: number;
-  type: 'house' | 'minka' | 'pagoda' | 'torii' | 'barn';
+export interface TrackDef {
+  id: number;
   color: string;
-  roofColor: string;
+  segments: Point[][];
+  terminating: boolean;
 }
 
-export interface GrassBlade {
-  x: number;
-  h: number;
-  lean: number;
-  phase: number;
-  color: string;
+export interface TrainDef {
+  id: number;
+  trackId: number;
+  numCars: number;
+  bodyColor: string;
+  stripeColor: string;
+  maxSpeed: number;
+  acceleration: number;
+  deceleration: number;
+  direction: 1 | -1;
+  initialProgress: number;
+  bodyW: number;
+  bodyH: number;
+  stopProgress?: number;
+  stopDuration?: number;
 }
 
-export interface Particle {
+export interface TrainState {
+  def: TrainDef;
   x: number;
   y: number;
-  vx: number;
-  vy: number;
-  size: number;
-  life: number;
-  maxLife: number;
-  type: 'dust' | 'firefly' | 'seed';
+  angle: number;
+  progress: number;
+  currentSpeed: number;
+  phase: 'cruising' | 'approaching' | 'stopping' | 'stopped' | 'departing';
+  stopTimer: number;
+  signal: 'red' | 'green';
+  activeTrackId: number;
+  activeDirection: 1 | -1;
+  steamPuffs: SteamPuff[];
+  speedLines: SpeedLine[];
 }
 
 export interface SteamPuff {
@@ -54,26 +68,17 @@ export interface SteamPuff {
   maxLife: number;
 }
 
-export interface Butterfly {
+export interface SpeedLine {
   x: number;
   y: number;
-  vx: number;
-  vy: number;
-  phase: number;
-  color: string;
-  size: number;
+  len: number;
+  alpha: number;
 }
 
-export interface RicePaddy {
+export interface PlatformDef {
   x: number;
   y: number;
   w: number;
   h: number;
-  stalks: { dx: number; h: number; phase: number }[];
-}
-
-export interface TreeData {
-  x: number;
-  scale: number;
-  isHero?: boolean;
+  angle: number;
 }
