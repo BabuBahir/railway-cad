@@ -40,6 +40,14 @@ export const COASTAL = {
   TREE_SPACING: 160,
 } as const;
 
+export const SHIPS = [
+  { x: 200, y: MY + 520, speed: 0.3, hullW: 40, hullH: 20, color: '#8b4513', dir: 1 },
+  { x: 900, y: MY + 560, speed: 0.4, hullW: 72, hullH: 32, color: '#555555', dir: -1 },
+  { x: 1500, y: MY + 540, speed: 0.35, hullW: 56, hullH: 24, color: '#cc3333', dir: 1 },
+  { x: 600, y: MY + 580, speed: 0.25, hullW: 40, hullH: 20, color: '#2266aa', dir: -1 },
+  { x: 1800, y: MY + 510, speed: 0.45, hullW: 48, hullH: 20, color: '#228844', dir: 1 },
+] as const;
+
 export const ROAD = {
   Y: 30,
   HEIGHT: 30,

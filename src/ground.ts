@@ -1,5 +1,5 @@
 import type { SceneState } from './types';
-import { WORLD, COLORS, COASTAL, YARD_BOUNDARY_Y, ANIME, ROAD } from './config';
+import { WORLD, COLORS, COASTAL, YARD_BOUNDARY_Y, ANIME, ROAD, SHIPS } from './config';
 
 let groundCanvas: HTMLCanvasElement | null = null;
 
@@ -371,6 +371,65 @@ function drawWetSand(ctx: CanvasRenderingContext2D, W: number, sandY: number, wa
   }
 }
 
+function drawShip(ctx: CanvasRenderingContext2D, x: number, y: number, hullW: number, hullH: number, color: string, dir: number, time: number) {
+  const bob = Math.sin(time * 0.025 + x * 0.005) * 1.5;
+
+  ctx.save();
+  ctx.translate(x, y + bob);
+  if (dir < 0) ctx.scale(-1, 1);
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(-hullW / 2, -hullH / 2);
+  ctx.lineTo(hullW / 2, -hullH / 2);
+  ctx.lineTo(hullW / 2 + hullW * 0.25, 0);
+  ctx.lineTo(hullW / 2, hullH / 2);
+  ctx.lineTo(-hullW / 2, hullH / 2);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = ANIME.OUTLINE_COLOR;
+  ctx.lineWidth = 1.0;
+  ctx.stroke();
+
+  ctx.fillStyle = '#ddd';
+  ctx.fillRect(-hullW * 0.15, -hullH * 0.35, hullW * 0.3, hullH * 0.7);
+  ctx.strokeStyle = ANIME.OUTLINE_COLOR;
+  ctx.lineWidth = 0.8;
+  ctx.strokeRect(-hullW * 0.15, -hullH * 0.35, hullW * 0.3, hullH * 0.7);
+
+  ctx.restore();
+
+  for (let i = 0; i < 4; i++) {
+    const wx = x - dir * (hullW * 0.5 + 5 + i * 8);
+    const wy = y + bob + Math.sin(time * 0.04 + i) * 1;
+    const alpha = 0.3 - i * 0.07;
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.fillRect(wx, wy - 1.5, 6, 3);
+  }
+}
+
+const shipState: { x: number; y: number }[] = SHIPS.map(s => ({ x: s.x, y: s.y }));
+
+function updateShips(_time: number) {
+  for (let i = 0; i < shipState.length; i++) {
+    const def = SHIPS[i];
+    shipState[i].x += def.speed * def.dir;
+
+    if (def.dir > 0 && shipState[i].x > WORLD.WIDTH + 40) {
+      shipState[i].x = -40;
+    } else if (def.dir < 0 && shipState[i].x < -40) {
+      shipState[i].x = WORLD.WIDTH + 40;
+    }
+  }
+}
+
+function drawShips(ctx: CanvasRenderingContext2D, time: number) {
+  for (let i = 0; i < shipState.length; i++) {
+    const def = SHIPS[i];
+    drawShip(ctx, shipState[i].x, shipState[i].y, def.hullW, def.hullH, def.color, def.dir, time);
+  }
+}
+
 export function drawCoastalArea(s: SceneState) {
   const { ctx } = s;
   const W = WORLD.WIDTH;
@@ -397,6 +456,9 @@ export function drawCoastalArea(s: SceneState) {
   drawWetSand(ctx, W, sandY, waterY, s.time);
   drawPixelatedFoam(ctx, W, waterY, s.time);
   drawSeaWaves(ctx, W, waterY, s.time);
+
+  updateShips(s.time);
+  drawShips(ctx, s.time);
 
   const treeStartX = 100;
   const treeSpacing = COASTAL.TREE_SPACING;
