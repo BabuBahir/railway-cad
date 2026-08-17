@@ -1,5 +1,5 @@
 import type { SceneState, Point } from './types';
-import { TRACKS, COLORS, ANIME } from './config';
+import { TRACKS, COLORS, ANIME, WORLD } from './config';
 
 function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t;
@@ -32,8 +32,11 @@ export function getTrackPoints(segment: Point[], resolution: number = 8): Point[
   return points;
 }
 
+let cachedAllTrackPoints: Point[][] | null = null;
+
 export function getAllTrackPoints(): Point[][] {
-  return TRACKS.map(track => {
+  if (cachedAllTrackPoints) return cachedAllTrackPoints;
+  cachedAllTrackPoints = TRACKS.map(track => {
     const allPoints: Point[] = [];
     for (const seg of track.segments) {
       const pts = getTrackPoints(seg);
@@ -44,6 +47,7 @@ export function getAllTrackPoints(): Point[][] {
     }
     return allPoints;
   });
+  return cachedAllTrackPoints;
 }
 
 function getAngle(p1: Point, p2: Point): number {
@@ -122,6 +126,8 @@ export function getTrackLength(trackId: number): number {
   buildArcLengthTable(trackId, points);
   return arcLengths[trackId]!;
 }
+
+let trackCanvas: HTMLCanvasElement | null = null;
 
 function drawBallast(ctx: CanvasRenderingContext2D, points: Point[]) {
   if (points.length < 2) return;
@@ -300,26 +306,38 @@ function drawCatenary(ctx: CanvasRenderingContext2D, points: Point[]) {
   }
 }
 
-export function drawAllTracks(s: SceneState) {
+function buildTrackCache(): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.width = WORLD.WIDTH;
+  c.height = WORLD.HEIGHT;
+  const tctx = c.getContext('2d')!;
+
   const allTrackPoints = getAllTrackPoints();
 
   for (const points of allTrackPoints) {
-    drawBallast(s.ctx, points);
+    drawBallast(tctx, points);
   }
   for (const points of allTrackPoints) {
-    drawSleepers(s.ctx, points);
-  }
-
-  for (let i = 0; i < TRACKS.length; i++) {
-    drawRails(s.ctx, allTrackPoints[i]);
+    drawSleepers(tctx, points);
   }
   for (let i = 0; i < TRACKS.length; i++) {
-    drawRailOutlines(s.ctx, allTrackPoints[i]);
+    drawRails(tctx, allTrackPoints[i]);
   }
-
+  for (let i = 0; i < TRACKS.length; i++) {
+    drawRailOutlines(tctx, allTrackPoints[i]);
+  }
   for (let i = 0; i < TRACKS.length; i++) {
     if (TRACKS[i].electrified) {
-      drawCatenary(s.ctx, allTrackPoints[i]);
+      drawCatenary(tctx, allTrackPoints[i]);
     }
   }
+
+  return c;
+}
+
+export function drawAllTracks(s: SceneState) {
+  if (!trackCanvas) {
+    trackCanvas = buildTrackCache();
+  }
+  s.ctx.drawImage(trackCanvas, 0, 0);
 }

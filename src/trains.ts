@@ -482,8 +482,7 @@ function updateTrainPhysics(train: TrainState) {
 
   train.progress = (train.progress % 1 + 1) % 1;
 
-  const allTrackPoints = getAllTrackPoints();
-  const trackPoints = allTrackPoints[train.activeTrackId];
+  const trackPoints = getAllTrackPoints()[train.activeTrackId];
   if (trackPoints) {
     const pos = getTrackPosition(trackPoints, train.progress, train.activeTrackId);
     train.x = pos.x;

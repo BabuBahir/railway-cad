@@ -31,16 +31,28 @@ export function drawPaperTexture(s: SceneState) {
   ctx.restore();
 }
 
-export function drawVignette(s: SceneState) {
-  const { ctx } = s;
-  const cx = WORLD.WIDTH / 2;
-  const cy = WORLD.HEIGHT / 2;
-  const grad = ctx.createRadialGradient(cx, cy, 200, cx, cy, WORLD.WIDTH * 0.6);
+let vignetteCanvas: HTMLCanvasElement | null = null;
+
+function getVignetteTexture(W: number, H: number): HTMLCanvasElement {
+  if (vignetteCanvas && vignetteCanvas.width === W && vignetteCanvas.height === H) return vignetteCanvas;
+  vignetteCanvas = document.createElement('canvas');
+  vignetteCanvas.width = W;
+  vignetteCanvas.height = H;
+  const vctx = vignetteCanvas.getContext('2d')!;
+  const cx = W / 2;
+  const cy = H / 2;
+  const grad = vctx.createRadialGradient(cx, cy, 200, cx, cy, W * 0.6);
   grad.addColorStop(0, 'rgba(0,0,0,0)');
   grad.addColorStop(0.7, 'rgba(0,0,0,0)');
   grad.addColorStop(1, 'rgba(20, 15, 10, 0.2)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, WORLD.WIDTH, WORLD.HEIGHT);
+  vctx.fillStyle = grad;
+  vctx.fillRect(0, 0, W, H);
+  return vignetteCanvas;
+}
+
+export function drawVignette(s: SceneState) {
+  const tex = getVignetteTexture(WORLD.WIDTH, WORLD.HEIGHT);
+  s.ctx.drawImage(tex, 0, 0);
 }
 
 let scanlineCanvas: HTMLCanvasElement | null = null;
@@ -71,24 +83,37 @@ export function drawScanlines(s: SceneState) {
   ctx.restore();
 }
 
-export function drawCRTEffect(s: SceneState) {
-  const { ctx } = s;
-  const cx = WORLD.WIDTH / 2;
-  const cy = WORLD.HEIGHT / 2;
+let crtCanvas: HTMLCanvasElement | null = null;
 
-  const grad = ctx.createRadialGradient(cx, cy, WORLD.WIDTH * 0.25, cx, cy, WORLD.WIDTH * 0.65);
+function getCRTTexture(W: number, H: number): HTMLCanvasElement {
+  if (crtCanvas && crtCanvas.width === W && crtCanvas.height === H) return crtCanvas;
+  crtCanvas = document.createElement('canvas');
+  crtCanvas.width = W;
+  crtCanvas.height = H;
+  const cctx = crtCanvas.getContext('2d')!;
+  const cx = W / 2;
+  const cy = H / 2;
+
+  const grad = cctx.createRadialGradient(cx, cy, W * 0.25, cx, cy, W * 0.65);
   grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
   grad.addColorStop(0.6, 'rgba(0, 0, 0, 0)');
   grad.addColorStop(1, 'rgba(0, 0, 0, 0.25)');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, WORLD.WIDTH, WORLD.HEIGHT);
+  cctx.fillStyle = grad;
+  cctx.fillRect(0, 0, W, H);
 
-  const hueGrad = ctx.createLinearGradient(0, 0, WORLD.WIDTH, 0);
+  const hueGrad = cctx.createLinearGradient(0, 0, W, 0);
   hueGrad.addColorStop(0, 'rgba(100, 0, 0, 0.03)');
   hueGrad.addColorStop(0.5, 'rgba(0, 0, 0, 0)');
   hueGrad.addColorStop(1, 'rgba(0, 0, 100, 0.03)');
-  ctx.fillStyle = hueGrad;
-  ctx.fillRect(0, 0, WORLD.WIDTH, WORLD.HEIGHT);
+  cctx.fillStyle = hueGrad;
+  cctx.fillRect(0, 0, W, H);
+
+  return crtCanvas;
+}
+
+export function drawCRTEffect(s: SceneState) {
+  const tex = getCRTTexture(WORLD.WIDTH, WORLD.HEIGHT);
+  s.ctx.drawImage(tex, 0, 0);
 }
 
 export function applyPixelation(ctx: CanvasRenderingContext2D, w: number, h: number, scale: number) {

@@ -186,16 +186,19 @@ function updateRoadCars(time: number) {
     lastCarSpawn = time;
   }
 
-  for (let i = roadCars.length - 1; i >= 0; i--) {
+  let writeIdx = 0;
+  for (let i = 0; i < roadCars.length; i++) {
     roadCars[i].x += roadCars[i].speed;
-    if (roadCars[i].x < -40 || roadCars[i].x > WORLD.WIDTH + 40) {
-      roadCars.splice(i, 1);
+    if (roadCars[i].x >= -40 && roadCars[i].x <= WORLD.WIDTH + 40) {
+      roadCars[writeIdx++] = roadCars[i];
     }
   }
+  roadCars.length = writeIdx;
 }
 
 function drawRoadCars(ctx: CanvasRenderingContext2D) {
-  for (const car of roadCars) {
+  for (let i = 0; i < roadCars.length; i++) {
+    const car = roadCars[i];
     const laneY = car.lane === 0 ? ROAD.Y + 8 : ROAD.Y + ROAD.HEIGHT - 8;
     const carW = 14;
     const carH = 6;
@@ -279,29 +282,50 @@ export function drawRoad(s: SceneState) {
   drawStationSign(ctx, ROAD.SIGN_X, s.time);
 }
 
+let sandCanvas: HTMLCanvasElement | null = null;
+
+function getSandTexture(W: number, sandY: number, waterY: number): HTMLCanvasElement {
+  const h = waterY - sandY;
+  if (sandCanvas && sandCanvas.width === W && sandCanvas.height === h) return sandCanvas;
+  sandCanvas = document.createElement('canvas');
+  sandCanvas.width = W;
+  sandCanvas.height = h;
+  const sctx = sandCanvas.getContext('2d')!;
+
+  const sandGrad = sctx.createLinearGradient(0, 0, 0, h);
+  sandGrad.addColorStop(0, COLORS.SAND);
+  sandGrad.addColorStop(1, COLORS.SAND_DARK);
+  sctx.fillStyle = sandGrad;
+  sctx.fillRect(0, 0, W, h);
+
+  const imageData = sctx.getImageData(0, 0, W, h);
+  for (let i = 0; i < imageData.data.length; i += 4) {
+    const noise = (Math.random() - 0.5) * 12;
+    imageData.data[i] = Math.max(0, Math.min(255, imageData.data[i] + noise));
+    imageData.data[i + 1] = Math.max(0, Math.min(255, imageData.data[i + 1] + noise));
+    imageData.data[i + 2] = Math.max(0, Math.min(255, imageData.data[i + 2] + noise));
+  }
+  sctx.putImageData(imageData, 0, 0);
+
+  return sandCanvas;
+}
+
 function drawPixelatedFoam(ctx: CanvasRenderingContext2D, W: number, waterY: number, time: number) {
-  for (let x = 0; x < W; x += 3) {
+  for (let x = 0; x < W; x += 6) {
     const waveOffset = Math.sin((x + time * 4) * 0.03) * 4 + Math.sin((x + time * 2.5) * 0.07) * 2;
     const foamHeight = 2 + Math.abs(Math.sin((x + time * 3) * 0.05)) * 5;
     const alpha = 0.3 + Math.sin((x + time * 5) * 0.08) * 0.15;
 
-    if (Math.random() < 0.6) {
-      ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-      ctx.fillRect(x, waterY + waveOffset - foamHeight / 2, 3, foamHeight);
-    }
-
-    if (Math.random() < 0.3) {
-      ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
-      ctx.fillRect(x, waterY + waveOffset - foamHeight - 1, 2, 1);
-    }
+    ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+    ctx.fillRect(x, waterY + waveOffset - foamHeight / 2, 6, foamHeight);
   }
 }
 
 function drawSeaWaves(ctx: CanvasRenderingContext2D, W: number, waterY: number, time: number) {
-  const numWaves = 10;
+  const numWaves = 8;
 
   for (let i = 0; i < numWaves; i++) {
-    const waveY = waterY + 15 + i * 22;
+    const waveY = waterY + 15 + i * 28;
     const depth01 = i / numWaves;
     const alpha = 0.25 - depth01 * 0.15;
     const thickness = 3.5 - depth01 * 1.5;
@@ -312,7 +336,7 @@ function drawSeaWaves(ctx: CanvasRenderingContext2D, W: number, waterY: number, 
     ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
     ctx.lineWidth = thickness;
     ctx.beginPath();
-    for (let x = 0; x < W; x += 2) {
+    for (let x = 0; x < W; x += 4) {
       const y1 = Math.sin((x + time * speed + i * 50) * freq1) * 5;
       const y2 = Math.sin((x + time * speed * 0.7 + i * 30) * freq2) * 2.5;
       const y = waveY + y1 + y2;
@@ -321,14 +345,14 @@ function drawSeaWaves(ctx: CanvasRenderingContext2D, W: number, waterY: number, 
     }
     ctx.stroke();
 
-    if (i < 3) {
-      for (let x = 0; x < W; x += 6) {
+    if (i < 2) {
+      for (let x = 0; x < W; x += 10) {
         const y1 = Math.sin((x + time * speed + i * 50) * freq1) * 5;
         const y2 = Math.sin((x + time * speed * 0.7 + i * 30) * freq2) * 2.5;
         const dy = Math.cos((x + time * speed + i * 50) * freq1) * freq1 * 5;
-        if (Math.abs(dy) > 0.02 && Math.random() < 0.4) {
+        if (Math.abs(dy) > 0.02) {
           ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.8})`;
-          ctx.fillRect(x, waveY + y1 + y2 - 1, 4, 2);
+          ctx.fillRect(x, waveY + y1 + y2 - 1, 5, 2);
         }
       }
     }
@@ -337,12 +361,12 @@ function drawSeaWaves(ctx: CanvasRenderingContext2D, W: number, waterY: number, 
 
 function drawWetSand(ctx: CanvasRenderingContext2D, W: number, sandY: number, waterY: number, time: number) {
   const wetSandH = waterY - sandY;
-  for (let x = 0; x < W; x += 3) {
+  for (let x = 0; x < W; x += 6) {
     const waveReach = Math.sin((x + time * 4) * 0.03) * 6 + Math.sin((x + time * 2.5) * 0.07) * 3;
     const h = Math.max(0, wetSandH * 0.5 + waveReach);
     if (h > 2) {
       ctx.fillStyle = 'rgba(140, 120, 90, 0.25)';
-      ctx.fillRect(x, waterY - h, 3, h);
+      ctx.fillRect(x, waterY - h, 6, h);
     }
   }
 }
@@ -359,20 +383,8 @@ export function drawCoastalArea(s: SceneState) {
   ctx.fillStyle = grassGrad;
   ctx.fillRect(0, sandY - 30, W, 30);
 
-  const sandGrad = ctx.createLinearGradient(0, sandY, 0, waterY);
-  sandGrad.addColorStop(0, COLORS.SAND);
-  sandGrad.addColorStop(1, COLORS.SAND_DARK);
-  ctx.fillStyle = sandGrad;
-  ctx.fillRect(0, sandY, W, waterY - sandY);
-
-  const imageData = ctx.getImageData(0, sandY, W, Math.min(waterY - sandY, 60));
-  for (let i = 0; i < imageData.data.length; i += 4) {
-    const noise = (Math.random() - 0.5) * 12;
-    imageData.data[i] = Math.max(0, Math.min(255, imageData.data[i] + noise));
-    imageData.data[i + 1] = Math.max(0, Math.min(255, imageData.data[i + 1] + noise));
-    imageData.data[i + 2] = Math.max(0, Math.min(255, imageData.data[i + 2] + noise));
-  }
-  ctx.putImageData(imageData, 0, sandY);
+  const sandTex = getSandTexture(W, sandY, waterY);
+  ctx.drawImage(sandTex, 0, sandY);
 
   const seaGrad = ctx.createLinearGradient(0, waterY, 0, WORLD.HEIGHT);
   seaGrad.addColorStop(0, COLORS.SEA_LIGHT);
@@ -381,19 +393,6 @@ export function drawCoastalArea(s: SceneState) {
   seaGrad.addColorStop(1, '#0a3a5a');
   ctx.fillStyle = seaGrad;
   ctx.fillRect(0, waterY, W, WORLD.HEIGHT - waterY);
-
-  for (let band = 0; band < 8; band++) {
-    const bandY = waterY + band * 35;
-    const bandH = 35;
-    const bright = band % 2 === 0 ? 0.04 : -0.02;
-    ctx.fillStyle = `rgba(255, 255, 255, ${bright > 0 ? bright : 0})`;
-    if (bright > 0) {
-      ctx.fillRect(0, bandY, W, bandH);
-    } else {
-      ctx.fillStyle = `rgba(0, 0, 30, ${Math.abs(bright)})`;
-      ctx.fillRect(0, bandY, W, bandH);
-    }
-  }
 
   drawWetSand(ctx, W, sandY, waterY, s.time);
   drawPixelatedFoam(ctx, W, waterY, s.time);
