@@ -1,6 +1,6 @@
 import type { SceneState, Camera } from './types';
 import { WORLD } from './config';
-import { drawGround, drawGrassEdges } from './ground';
+import { drawGround, drawGrassEdges, drawCoastalArea, drawYardBoundary, drawRoad } from './ground';
 import { drawAllTracks } from './track';
 import { drawTrains } from './trains';
 import { drawPlatforms } from './station';
@@ -50,6 +50,9 @@ function render() {
 
   drawGround(state);
   drawGrassEdges(state);
+  drawRoad(state);
+  drawYardBoundary(state);
+  drawCoastalArea(state);
   drawAllTracks(state);
   drawPlatforms(state);
   drawTrains(state);

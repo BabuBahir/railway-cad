@@ -22,7 +22,6 @@ export interface TrackDef {
   id: number;
   color: string;
   segments: Point[][];
-  terminating: boolean;
   electrified?: boolean;
 }
 
@@ -51,13 +50,14 @@ export interface TrainState {
   angle: number;
   progress: number;
   currentSpeed: number;
-  phase: 'cruising' | 'approaching' | 'stopping' | 'stopped' | 'departing';
+  phase: 'cruising' | 'slowing' | 'stopped';
   stopTimer: number;
   signal: 'red' | 'green';
   activeTrackId: number;
   activeDirection: 1 | -1;
   steamPuffs: SteamPuff[];
   speedLines: SpeedLine[];
+  sparks: Spark[];
 }
 
 export interface SteamPuff {
@@ -75,6 +75,15 @@ export interface SpeedLine {
   y: number;
   len: number;
   alpha: number;
+}
+
+export interface Spark {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
 }
 
 export interface PlatformDef {

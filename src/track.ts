@@ -50,34 +50,77 @@ function getAngle(p1: Point, p2: Point): number {
   return Math.atan2(p2.y - p1.y, p2.x - p1.x);
 }
 
-export function getTrackPosition(trackPoints: Point[], progress: number): { x: number; y: number; angle: number } {
+const cumulativeDistances: number[][] = [];
+const arcLengths: number[] = [];
+
+function buildArcLengthTable(trackId: number, points: Point[]): number[] {
+  if (cumulativeDistances[trackId]) return cumulativeDistances[trackId];
+  const dists: number[] = [0];
+  let total = 0;
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i].x - points[i - 1].x;
+    const dy = points[i].y - points[i - 1].y;
+    total += Math.sqrt(dx * dx + dy * dy);
+    dists.push(total);
+  }
+  cumulativeDistances[trackId] = dists;
+  arcLengths[trackId] = total;
+  return dists;
+}
+
+export function getTrackPosition(trackPoints: Point[], progress: number, trackId?: number): { x: number; y: number; angle: number } {
   const totalLen = trackPoints.length - 1;
-  const idx = Math.max(0, Math.min(totalLen - 1, progress * totalLen));
-  const i = Math.floor(idx);
-  const t = idx - i;
-  const p1 = trackPoints[i];
-  const p2 = trackPoints[Math.min(i + 1, totalLen)];
+  if (totalLen < 1) return { x: 0, y: 0, angle: 0 };
+
+  let dists: number[];
+  let totalDist: number;
+
+  if (trackId !== undefined) {
+    dists = buildArcLengthTable(trackId, trackPoints);
+    totalDist = arcLengths[trackId]!;
+  } else {
+    const tempDists: number[] = [0];
+    let t = 0;
+    for (let i = 1; i < trackPoints.length; i++) {
+      const dx = trackPoints[i].x - trackPoints[i - 1].x;
+      const dy = trackPoints[i].y - trackPoints[i - 1].y;
+      t += Math.sqrt(dx * dx + dy * dy);
+      tempDists.push(t);
+    }
+    dists = tempDists;
+    totalDist = t;
+  }
+
+  if (totalDist === 0) return { x: trackPoints[0].x, y: trackPoints[0].y, angle: 0 };
+
+  const targetDist = Math.max(0, Math.min(1, progress)) * totalDist;
+
+  let lo = 0;
+  let hi = trackPoints.length - 1;
+  while (lo < hi - 1) {
+    const mid = (lo + hi) >> 1;
+    if (dists[mid] <= targetDist) lo = mid;
+    else hi = mid;
+  }
+
+  const segLen = dists[hi] - dists[lo];
+  const t = segLen > 0 ? (targetDist - dists[lo]) / segLen : 0;
+
+  const p1 = trackPoints[lo];
+  const p2 = trackPoints[hi];
   const x = lerp(p1.x, p2.x, t);
   const y = lerp(p1.y, p2.y, t);
   const angle = getAngle(p1, p2);
   return { x, y, angle };
 }
 
-const trackLengths: number[] = [];
-
 export function getTrackLength(trackId: number): number {
-  if (trackLengths[trackId] !== undefined) return trackLengths[trackId];
+  if (arcLengths[trackId] !== undefined) return arcLengths[trackId];
   const allPoints = getAllTrackPoints();
   const points = allPoints[trackId];
   if (!points || points.length < 2) return 0;
-  let len = 0;
-  for (let i = 1; i < points.length; i++) {
-    const dx = points[i].x - points[i - 1].x;
-    const dy = points[i].y - points[i - 1].y;
-    len += Math.sqrt(dx * dx + dy * dy);
-  }
-  trackLengths[trackId] = len;
-  return len;
+  buildArcLengthTable(trackId, points);
+  return arcLengths[trackId]!;
 }
 
 function drawBallast(ctx: CanvasRenderingContext2D, points: Point[]) {
@@ -257,57 +300,6 @@ function drawCatenary(ctx: CanvasRenderingContext2D, points: Point[]) {
   }
 }
 
-function drawSwitchIndicator(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(angle);
-  ctx.fillStyle = '#c03030';
-  ctx.beginPath();
-  ctx.arc(0, 0, 5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = ANIME.OUTLINE_COLOR;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-  ctx.fillStyle = '#ff4040';
-  ctx.beginPath();
-  ctx.arc(0, 0, 2.5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawBufferStop(ctx: CanvasRenderingContext2D, points: Point[]) {
-  if (points.length < 2) return;
-  const last = points[points.length - 1];
-  const prev = points[points.length - 2];
-  const angle = Math.atan2(last.y - prev.y, last.x - prev.x);
-
-  ctx.save();
-  ctx.translate(last.x, last.y);
-  ctx.rotate(angle);
-
-  ctx.fillStyle = '#4a4a4a';
-  ctx.fillRect(-3, -16, 6, 32);
-  ctx.strokeStyle = ANIME.OUTLINE_COLOR;
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(-3, -16, 6, 32);
-
-  ctx.fillStyle = '#333';
-  ctx.fillRect(-9, -13, 18, 26);
-  ctx.strokeStyle = ANIME.OUTLINE_COLOR;
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(-9, -13, 18, 26);
-
-  ctx.fillStyle = '#555';
-  ctx.beginPath();
-  ctx.arc(0, 0, 5, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = ANIME.OUTLINE_COLOR;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  ctx.restore();
-}
-
 export function drawAllTracks(s: SceneState) {
   const allTrackPoints = getAllTrackPoints();
 
@@ -329,18 +321,5 @@ export function drawAllTracks(s: SceneState) {
     if (TRACKS[i].electrified) {
       drawCatenary(s.ctx, allTrackPoints[i]);
     }
-  }
-
-  for (let i = 0; i < TRACKS.length; i++) {
-    if (TRACKS[i].terminating) {
-      drawBufferStop(s.ctx, allTrackPoints[i]);
-    }
-  }
-
-  const switchPositions = [
-    { x: 660, y: 652, angle: -0.15 },
-  ];
-  for (const sw of switchPositions) {
-    drawSwitchIndicator(s.ctx, sw.x, sw.y, sw.angle);
   }
 }

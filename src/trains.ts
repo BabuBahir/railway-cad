@@ -1,4 +1,4 @@
-import type { SceneState, TrainState, Passenger } from './types';
+import type { SceneState, TrainState, Passenger, Point } from './types';
 import { TRAINS, ANIME, SIGNAL_PROGRESS, PLATFORMS, PASSENGER_COLORS, PASSENGER_HAT_COLORS, PASSENGER_SHIRT_COLORS } from './config';
 import { getAllTrackPoints, getTrackPosition, getTrackLength } from './track';
 
@@ -6,7 +6,6 @@ const trainStates: TrainState[] = [];
 let trainsInit = false;
 
 const passengers: Passenger[] = [];
-const SPUR_TRAIN_ID = 4;
 const PASSENGER_COUNT = 10;
 const PASSENGER_SPEED = 0.4;
 
@@ -17,8 +16,8 @@ function initTrains() {
   for (const def of TRAINS) {
     const trackPoints = allTrackPoints[def.trackId];
     if (!trackPoints) continue;
-    const startPos = getTrackPosition(trackPoints, def.initialProgress);
-    const isTerminating = def.stopProgress !== undefined;
+    const startPos = getTrackPosition(trackPoints, def.initialProgress, def.trackId);
+    const hasStop = def.stopProgress !== undefined;
 
     trainStates.push({
       def,
@@ -26,14 +25,15 @@ function initTrains() {
       y: startPos.y,
       angle: startPos.angle,
       progress: def.initialProgress,
-      currentSpeed: isTerminating ? 0 : def.maxSpeed,
-      phase: isTerminating ? 'approaching' : 'cruising',
+      currentSpeed: hasStop ? def.maxSpeed : def.maxSpeed,
+      phase: 'cruising',
       stopTimer: 0,
       signal: 'green',
       activeTrackId: def.trackId,
       activeDirection: def.direction,
       steamPuffs: [],
       speedLines: [],
+      sparks: [],
     });
   }
 }
@@ -184,16 +184,39 @@ function drawBulletCarTopDown(
     ctx.arc(w / 2 + 14, 0, 18, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = '#cc2020';
+    const pantoBaseY = -h / 2 - 2;
+    const pantoTipY = -30;
+
+    ctx.strokeStyle = '#555';
+    ctx.lineWidth = 1.8;
     ctx.beginPath();
-    ctx.moveTo(2, -h / 2 - 6);
-    ctx.lineTo(8, -h / 2 - 6);
-    ctx.lineTo(10, -h / 2 - 12);
-    ctx.lineTo(0, -h / 2 - 12);
+    ctx.moveTo(0, pantoBaseY);
+    ctx.lineTo(-3, (pantoBaseY + pantoTipY) / 2);
+    ctx.lineTo(0, pantoTipY);
+    ctx.lineTo(3, (pantoBaseY + pantoTipY) / 2);
     ctx.closePath();
+    ctx.stroke();
+
+    ctx.strokeStyle = '#777';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(-3, pantoBaseY);
+    ctx.lineTo(0, pantoTipY);
+    ctx.lineTo(3, pantoBaseY);
+    ctx.stroke();
+
+    ctx.fillStyle = '#cc2020';
+    ctx.fillRect(-6, pantoTipY - 1.5, 12, 3);
+    ctx.strokeStyle = ANIME.OUTLINE_COLOR;
+    ctx.lineWidth = 0.5;
+    ctx.strokeRect(-6, pantoTipY - 1.5, 12, 3);
+
+    ctx.fillStyle = '#aa1a1a';
+    ctx.beginPath();
+    ctx.arc(0, pantoTipY, 2, 0, Math.PI * 2);
     ctx.fill();
     ctx.strokeStyle = ANIME.OUTLINE_COLOR;
-    ctx.lineWidth = 0.6;
+    ctx.lineWidth = 0.5;
     ctx.stroke();
   }
 
@@ -288,12 +311,9 @@ function shadeColor(color: string, percent: number) {
 }
 
 function spawnPassengers(train: TrainState) {
-  const plat = PLATFORMS[0];
+  const platIdx = train.activeTrackId === 1 ? 0 : 1;
+  const plat = PLATFORMS[platIdx];
   if (!plat) return;
-
-  const allTrackPoints = getAllTrackPoints();
-  const trackPoints = allTrackPoints[train.activeTrackId];
-  if (!trackPoints) return;
 
   const cosA = Math.cos(plat.angle);
   const sinA = Math.sin(plat.angle);
@@ -341,17 +361,10 @@ function spawnPassengers(train: TrainState) {
 }
 
 function dismissPassengers() {
-  const plat = PLATFORMS[0];
-  if (!plat) return;
-
-  const cosA = Math.cos(plat.angle);
-  const sinA = Math.sin(plat.angle);
-
   for (const p of passengers) {
     if (p.state === 'waiting' || p.state === 'walking_to_train') {
-      const offsetAcross = (Math.random() - 0.3) * (plat.h - 16);
-      p.targetX = plat.x + cosA * ((p.x - plat.x) * cosA + (p.y - plat.y) * sinA) - sinA * offsetAcross;
-      p.targetY = plat.y + sinA * ((p.x - plat.x) * cosA + (p.y - plat.y) * sinA) + cosA * offsetAcross;
+      p.targetX = p.x + (Math.random() - 0.5) * 60;
+      p.targetY = p.y + (Math.random() - 0.3) * 40;
       p.state = 'walking_away';
       p.seated = false;
     }
@@ -425,78 +438,34 @@ function drawPassengers(ctx: CanvasRenderingContext2D) {
 function updateTrainPhysics(train: TrainState) {
   const def = train.def;
   const trackLen = getTrackLength(train.activeTrackId);
+  const dir = train.activeDirection;
 
   switch (train.phase) {
     case 'cruising': {
-      train.currentSpeed = def.maxSpeed;
-      train.progress += (train.currentSpeed * train.activeDirection) / trackLen;
-      if (train.progress > 1) train.progress -= 1;
-      if (train.progress < 0) train.progress += 1;
+      train.currentSpeed = Math.min(def.maxSpeed, train.currentSpeed + def.acceleration);
+      if (def.stopProgress !== undefined) {
+        const distToStop = def.stopProgress - train.progress;
+        if (distToStop > 0 && distToStop <= 0.08) {
+          train.phase = 'slowing';
+        }
+      }
+      train.progress += (train.currentSpeed * dir) / trackLen;
       break;
     }
 
-    case 'approaching': {
+    case 'slowing': {
       const distToStop = def.stopProgress! - train.progress;
-
-      if (distToStop <= 0.002) {
+      if (distToStop <= 0.001) {
         train.progress = def.stopProgress!;
         train.currentSpeed = 0;
         train.phase = 'stopped';
         train.signal = 'red';
         train.stopTimer = def.stopDuration!;
-        if (train.def.id === SPUR_TRAIN_ID) {
-          spawnPassengers(train);
-        }
+        spawnPassengers(train);
         break;
       }
-
-      const brakingDist = (train.currentSpeed * train.currentSpeed) / (2 * def.deceleration) / trackLen;
-
-      if (brakingDist >= distToStop) {
-        train.currentSpeed = Math.max(0, train.currentSpeed - def.deceleration);
-        if (train.currentSpeed <= 0) {
-          train.progress = def.stopProgress!;
-          train.phase = 'stopped';
-          train.signal = 'red';
-          train.stopTimer = def.stopDuration!;
-          if (train.def.id === SPUR_TRAIN_ID) {
-            spawnPassengers(train);
-          }
-          break;
-        }
-        train.phase = 'stopping';
-      } else {
-        train.currentSpeed = Math.min(def.maxSpeed, train.currentSpeed + def.acceleration);
-      }
-
-      train.progress += (train.currentSpeed * train.activeDirection) / trackLen;
-      break;
-    }
-
-    case 'stopping': {
-      train.currentSpeed = Math.max(0, train.currentSpeed - def.deceleration);
-      if (train.currentSpeed <= 0) {
-        train.progress = def.stopProgress!;
-        train.currentSpeed = 0;
-        train.phase = 'stopped';
-        train.signal = 'red';
-        train.stopTimer = def.stopDuration!;
-        if (train.def.id === SPUR_TRAIN_ID) {
-          spawnPassengers(train);
-        }
-        break;
-      }
-      train.progress += (train.currentSpeed * train.activeDirection) / trackLen;
-      if (train.progress >= def.stopProgress!) {
-        train.progress = def.stopProgress!;
-        train.currentSpeed = 0;
-        train.phase = 'stopped';
-        train.signal = 'red';
-        train.stopTimer = def.stopDuration!;
-        if (train.def.id === SPUR_TRAIN_ID) {
-          spawnPassengers(train);
-        }
-      }
+      train.currentSpeed = Math.max(0.05, train.currentSpeed - def.deceleration);
+      train.progress += (train.currentSpeed * dir) / trackLen;
       break;
     }
 
@@ -504,34 +473,19 @@ function updateTrainPhysics(train: TrainState) {
       train.stopTimer--;
       if (train.stopTimer <= 0) {
         train.signal = 'green';
-        train.phase = 'departing';
-        train.activeDirection = (def.direction === 1 ? -1 : 1) as 1 | -1;
-        if (train.def.id === SPUR_TRAIN_ID) {
-          dismissPassengers();
-        }
-      }
-      break;
-    }
-
-    case 'departing': {
-      train.currentSpeed = Math.min(def.maxSpeed, train.currentSpeed + def.acceleration);
-      train.progress += (train.currentSpeed * train.activeDirection) / trackLen;
-
-      if (train.progress <= 0) {
-        train.progress = 0;
-        train.currentSpeed = 0;
-        train.phase = 'approaching';
-        train.activeDirection = def.direction;
+        train.phase = 'cruising';
+        dismissPassengers();
       }
       break;
     }
   }
 
+  train.progress = (train.progress % 1 + 1) % 1;
+
   const allTrackPoints = getAllTrackPoints();
   const trackPoints = allTrackPoints[train.activeTrackId];
   if (trackPoints) {
-    const clampedProgress = Math.max(0, Math.min(1, train.progress));
-    const pos = getTrackPosition(trackPoints, clampedProgress);
+    const pos = getTrackPosition(trackPoints, train.progress, train.activeTrackId);
     train.x = pos.x;
     train.y = pos.y;
     train.angle = pos.angle;
@@ -650,6 +604,79 @@ function updateSpeedLines(train: TrainState) {
   }
 }
 
+function getPantographTipWorld(train: TrainState, carAngle: number): { x: number; y: number } {
+  const tipLocalY = -30;
+  return {
+    x: train.x + tipLocalY * Math.sin(carAngle) * -1,
+    y: train.y + tipLocalY * Math.cos(carAngle),
+  };
+}
+
+function updateSparks(_s: SceneState, train: TrainState) {
+  if (!train.def.electric || train.currentSpeed < 0.15) return;
+
+  const tip = getPantographTipWorld(train, train.angle);
+
+  if (Math.random() < 0.15) {
+    const count = 1 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < count; i++) {
+      train.sparks.push({
+        x: tip.x + (Math.random() - 0.5) * 4,
+        y: tip.y + (Math.random() - 0.5) * 3,
+        vx: (Math.random() - 0.5) * 3,
+        vy: (Math.random() - 0.5) * 3 - 1,
+        life: 0,
+        maxLife: 3 + Math.floor(Math.random() * 5),
+      });
+    }
+  }
+
+  for (let i = train.sparks.length - 1; i >= 0; i--) {
+    const sp = train.sparks[i];
+    sp.x += sp.vx;
+    sp.y += sp.vy;
+    sp.vy += 0.1;
+    sp.life++;
+    if (sp.life > sp.maxLife) {
+      train.sparks.splice(i, 1);
+    }
+  }
+}
+
+function drawSparks(ctx: CanvasRenderingContext2D, train: TrainState) {
+  if (!train.def.electric || train.currentSpeed < 0.15) return;
+
+  const tip = getPantographTipWorld(train, train.angle);
+
+  const contactGlow = ctx.createRadialGradient(tip.x, tip.y, 0, tip.x, tip.y, 10);
+  contactGlow.addColorStop(0, 'rgba(180, 220, 255, 0.3)');
+  contactGlow.addColorStop(1, 'rgba(180, 220, 255, 0)');
+  ctx.fillStyle = contactGlow;
+  ctx.beginPath();
+  ctx.arc(tip.x, tip.y, 10, 0, Math.PI * 2);
+  ctx.fill();
+
+  for (const sp of train.sparks) {
+    const t = sp.life / sp.maxLife;
+    const alpha = t < 0.3 ? t / 0.3 : 1 - (t - 0.3) / 0.7;
+    const size = 1.5 * (1 - t * 0.5);
+
+    ctx.fillStyle = `rgba(255, 255, 200, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, size, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (Math.random() < 0.3) {
+      ctx.strokeStyle = `rgba(200, 230, 255, ${alpha * 0.6})`;
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.moveTo(sp.x, sp.y);
+      ctx.lineTo(sp.x + (Math.random() - 0.5) * 4, sp.y + (Math.random() - 0.5) * 4);
+      ctx.stroke();
+    }
+  }
+}
+
 function drawSignal(ctx: CanvasRenderingContext2D, x: number, y: number, color: 'red' | 'green') {
   ctx.save();
 
@@ -686,6 +713,20 @@ function drawSignal(ctx: CanvasRenderingContext2D, x: number, y: number, color: 
   ctx.restore();
 }
 
+function getCarPosition(
+  allTrackPoints: Point[][],
+  train: TrainState,
+  carOffset: number,
+): { x: number; y: number; angle: number } {
+  const trackPoints = allTrackPoints[train.activeTrackId];
+  if (!trackPoints) return { x: train.x, y: train.y, angle: train.angle };
+  const trackLen = getTrackLength(train.activeTrackId);
+  const progressOffset = carOffset / trackLen;
+  let carProgress = train.progress - progressOffset * train.activeDirection;
+  carProgress = (carProgress % 1 + 1) % 1;
+  return getTrackPosition(trackPoints, carProgress, train.activeTrackId);
+}
+
 export function drawTrains(s: SceneState) {
   initTrains();
   const allTrackPoints = getAllTrackPoints();
@@ -697,45 +738,45 @@ export function drawTrains(s: SceneState) {
 
   enforceCollisionSafety();
 
-  const spurTrain = trainStates.find(t => t.def.stopProgress !== undefined);
-  if (spurTrain) {
-    const spurPoints = allTrackPoints[spurTrain.activeTrackId];
-    if (spurPoints) {
-      const sigPos = getTrackPosition(spurPoints, SIGNAL_PROGRESS);
-      drawSignal(ctx, sigPos.x, sigPos.y - 18, spurTrain.signal);
+  for (const train of trainStates) {
+    if (train.def.stopProgress !== undefined) {
+      const trackPoints = allTrackPoints[train.activeTrackId];
+      if (trackPoints) {
+        const sigPos = getTrackPosition(trackPoints, SIGNAL_PROGRESS, train.activeTrackId);
+        drawSignal(ctx, sigPos.x, sigPos.y - 18, train.signal);
+      }
     }
   }
 
   for (const train of trainStates) {
     const isElectric = train.def.electric;
+    const carSpacing = train.def.bodyW + 10;
 
     ctx.fillStyle = 'rgba(0,0,0,0.08)';
     for (let i = 0; i < train.def.numCars; i++) {
-      const carIdx = train.activeDirection === 1 ? i : train.def.numCars - 1 - i;
-      const carX = train.x - carIdx * (train.def.bodyW + 10) * Math.cos(train.angle) * train.activeDirection;
-      const carY = train.y - carIdx * (train.def.bodyW + 10) * Math.sin(train.angle) * train.activeDirection;
+      const carOffset = i * carSpacing;
+      const carPos = getCarPosition(allTrackPoints, train, carOffset);
       ctx.beginPath();
-      ctx.ellipse(carX + 3, carY + 3, train.def.bodyW / 2, train.def.bodyH / 2, train.angle, 0, Math.PI * 2);
+      ctx.ellipse(carPos.x + 3, carPos.y + 3, train.def.bodyW / 2, train.def.bodyH / 2, carPos.angle, 0, Math.PI * 2);
       ctx.fill();
     }
 
     for (let i = 0; i < train.def.numCars; i++) {
-      const carIdx = train.activeDirection === 1 ? i : train.def.numCars - 1 - i;
-      const carX = train.x - carIdx * (train.def.bodyW + 10) * Math.cos(train.angle) * train.activeDirection;
-      const carY = train.y - carIdx * (train.def.bodyW + 10) * Math.sin(train.angle) * train.activeDirection;
+      const carOffset = i * carSpacing;
+      const carPos = getCarPosition(allTrackPoints, train, carOffset);
 
       if (isElectric) {
         const isLead = i === 0;
         const isTail = i === train.def.numCars - 1;
-        const drawLead = train.activeDirection === 1 ? isLead : isTail;
-        const drawTail = train.activeDirection === 1 ? isTail : isLead;
-        drawBulletCarTopDown(ctx, carX, carY, train.angle, train.def.bodyW, train.def.bodyH, train.def.bodyColor, train.def.stripeColor, drawLead, drawTail);
+        drawBulletCarTopDown(ctx, carPos.x, carPos.y, carPos.angle, train.def.bodyW, train.def.bodyH, train.def.bodyColor, train.def.stripeColor, isLead, isTail);
       } else {
-        drawCarTopDown(ctx, carX, carY, train.angle, train.def.bodyW, train.def.bodyH, train.def.bodyColor, train.def.stripeColor, i === 0);
+        drawCarTopDown(ctx, carPos.x, carPos.y, carPos.angle, train.def.bodyW, train.def.bodyH, train.def.bodyColor, train.def.stripeColor, i === 0);
       }
     }
 
     updateSteam(s, train);
+    updateSparks(s, train);
+    drawSparks(ctx, train);
 
     if (train.currentSpeed > 0.2) {
       const lineAlpha = isElectric ? 0.12 : 0.15;
