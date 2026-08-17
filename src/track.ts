@@ -179,6 +179,84 @@ function drawRailOutlines(ctx: CanvasRenderingContext2D, points: Point[]) {
   }
 }
 
+function drawCatenary(ctx: CanvasRenderingContext2D, points: Point[]) {
+  if (points.length < 2) return;
+
+  const poleSpacing = 80;
+
+  ctx.strokeStyle = COLORS.CATENARY;
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+
+  const polePositions: { x: number; y: number; angle: number }[] = [];
+  let accumForPoles = 0;
+  for (let i = 1; i < points.length; i++) {
+    const dx = points[i].x - points[i - 1].x;
+    const dy = points[i].y - points[i - 1].y;
+    accumForPoles += Math.sqrt(dx * dx + dy * dy);
+    if (accumForPoles >= poleSpacing) {
+      accumForPoles -= poleSpacing;
+      const angle = getAngle(points[i - 1], points[i]);
+      polePositions.push({ x: points[i].x, y: points[i].y, angle });
+    }
+  }
+
+  for (const pole of polePositions) {
+    ctx.save();
+    ctx.translate(pole.x, pole.y);
+    ctx.rotate(pole.angle);
+
+    ctx.fillStyle = '#6a6a6a';
+    ctx.fillRect(-1.5, -30, 3, 30);
+    ctx.strokeStyle = ANIME.OUTLINE_COLOR;
+    ctx.lineWidth = 0.6;
+    ctx.strokeRect(-1.5, -30, 3, 30);
+
+    ctx.fillRect(-1.5, -30, 12, 2);
+    ctx.strokeRect(-1.5, -30, 12, 2);
+
+    ctx.beginPath();
+    ctx.arc(10, -30, 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#8a8a8a';
+    ctx.fill();
+    ctx.strokeStyle = ANIME.OUTLINE_COLOR;
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  if (polePositions.length >= 2) {
+    ctx.beginPath();
+    ctx.moveTo(polePositions[0].x, polePositions[0].y - 28);
+    for (let i = 1; i < polePositions.length; i++) {
+      const prev = polePositions[i - 1];
+      const curr = polePositions[i];
+      const midX = (prev.x + curr.x) / 2;
+      const midY = (prev.y + curr.y) / 2 + 3;
+      ctx.quadraticCurveTo(prev.x, prev.y - 28, midX, midY - 28);
+      ctx.quadraticCurveTo(curr.x, curr.y - 28, curr.x, curr.y - 28);
+    }
+    ctx.strokeStyle = '#aaa';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(polePositions[0].x + 10, polePositions[0].y - 30);
+    for (let i = 1; i < polePositions.length; i++) {
+      const prev = polePositions[i - 1];
+      const curr = polePositions[i];
+      const midX = (prev.x + curr.x) / 2;
+      const midY = (prev.y + curr.y) / 2 + 2;
+      ctx.quadraticCurveTo(prev.x + 10, prev.y - 30, midX, midY - 30);
+      ctx.quadraticCurveTo(curr.x + 10, curr.y - 30, curr.x + 10, curr.y - 30);
+    }
+    ctx.strokeStyle = '#777';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+  }
+}
+
 function drawSwitchIndicator(ctx: CanvasRenderingContext2D, x: number, y: number, angle: number) {
   ctx.save();
   ctx.translate(x, y);
@@ -239,11 +317,18 @@ export function drawAllTracks(s: SceneState) {
   for (const points of allTrackPoints) {
     drawSleepers(s.ctx, points);
   }
-  for (const points of allTrackPoints) {
-    drawRails(s.ctx, points);
+
+  for (let i = 0; i < TRACKS.length; i++) {
+    drawRails(s.ctx, allTrackPoints[i]);
   }
-  for (const points of allTrackPoints) {
-    drawRailOutlines(s.ctx, points);
+  for (let i = 0; i < TRACKS.length; i++) {
+    drawRailOutlines(s.ctx, allTrackPoints[i]);
+  }
+
+  for (let i = 0; i < TRACKS.length; i++) {
+    if (TRACKS[i].electrified) {
+      drawCatenary(s.ctx, allTrackPoints[i]);
+    }
   }
 
   for (let i = 0; i < TRACKS.length; i++) {

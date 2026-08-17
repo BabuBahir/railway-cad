@@ -23,6 +23,7 @@ export interface TrackDef {
   color: string;
   segments: Point[][];
   terminating: boolean;
+  electrified?: boolean;
 }
 
 export interface TrainDef {
@@ -40,6 +41,7 @@ export interface TrainDef {
   bodyH: number;
   stopProgress?: number;
   stopDuration?: number;
+  electric?: boolean;
 }
 
 export interface TrainState {
@@ -81,4 +83,16 @@ export interface PlatformDef {
   w: number;
   h: number;
   angle: number;
+}
+
+export interface Passenger {
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  speed: number;
+  color: string;
+  hatColor: string;
+  state: 'walking_to_train' | 'waiting' | 'walking_away' | 'done';
+  seated?: boolean;
 }

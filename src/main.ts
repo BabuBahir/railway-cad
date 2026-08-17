@@ -4,7 +4,7 @@ import { drawGround, drawGrassEdges } from './ground';
 import { drawAllTracks } from './track';
 import { drawTrains } from './trains';
 import { drawPlatforms } from './station';
-import { drawPaperTexture, drawVignette } from './effects';
+import { drawPaperTexture, drawVignette, drawScanlines, drawCRTEffect } from './effects';
 
 const canvas = document.createElement('canvas');
 const ctx = canvas.getContext('2d')!;
@@ -32,8 +32,7 @@ function resize() {
   canvas.height = state.H;
 
   const scaleX = state.W / WORLD.WIDTH;
-  const scaleY = state.H / WORLD.HEIGHT;
-  camera.zoom = Math.min(scaleX, scaleY);
+  camera.zoom = scaleX;
   camera.offsetX = (WORLD.WIDTH - state.W / camera.zoom) / 2;
   camera.offsetY = (WORLD.HEIGHT - state.H / camera.zoom) / 2;
 }
@@ -56,6 +55,8 @@ function render() {
   drawTrains(state);
   drawPaperTexture(state);
   drawVignette(state);
+  drawScanlines(state);
+  drawCRTEffect(state);
 
   ctx.restore();
 

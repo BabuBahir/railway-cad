@@ -16,6 +16,7 @@ export const COLORS = {
   PLATFORM: '#b0a898',
   PLATFORM_DARK: '#908878',
   GRASS: '#4a7c32',
+  CATENARY: '#888',
 } as const;
 
 export const WORLD = {
@@ -32,12 +33,14 @@ export const TRACKS: readonly TrackDef[] = [
     color: '#8a3030',
     terminating: false,
     segments: [[
+      { x: -200, y: MY - 45 },
       { x: 0, y: MY - 50 },
       { x: MX * 0.4, y: MY - 60 },
       { x: MX * 0.8, y: MY - 40 },
       { x: MX * 1.2, y: MY - 30 },
       { x: MX * 1.6, y: MY - 45 },
       { x: WORLD.WIDTH, y: MY - 35 },
+      { x: WORLD.WIDTH + 200, y: MY - 30 },
     ]],
   },
   {
@@ -45,12 +48,14 @@ export const TRACKS: readonly TrackDef[] = [
     color: '#3060a0',
     terminating: false,
     segments: [[
+      { x: -200, y: MY + 105 },
       { x: 0, y: MY + 110 },
       { x: MX * 0.4, y: MY + 100 },
       { x: MX * 0.8, y: MY + 115 },
       { x: MX * 1.2, y: MY + 105 },
       { x: MX * 1.6, y: MY + 100 },
       { x: WORLD.WIDTH, y: MY + 110 },
+      { x: WORLD.WIDTH + 200, y: MY + 115 },
     ]],
   },
   {
@@ -58,12 +63,14 @@ export const TRACKS: readonly TrackDef[] = [
     color: '#2a7a3a',
     terminating: false,
     segments: [[
+      { x: -200, y: MY + 255 },
       { x: 0, y: MY + 260 },
       { x: MX * 0.4, y: MY + 250 },
       { x: MX * 0.8, y: MY + 265 },
       { x: MX * 1.2, y: MY + 255 },
       { x: MX * 1.6, y: MY + 250 },
       { x: WORLD.WIDTH, y: MY + 260 },
+      { x: WORLD.WIDTH + 200, y: MY + 255 },
     ]],
   },
   {
@@ -71,12 +78,12 @@ export const TRACKS: readonly TrackDef[] = [
     color: '#a06020',
     terminating: true,
     segments: [[
-      { x: MX * 0.55, y: MY - 48 },
-      { x: MX * 0.7, y: MY - 78 },
-      { x: MX * 0.85, y: MY - 108 },
-      { x: MX * 1.0, y: MY - 130 },
-      { x: MX * 1.15, y: MY - 142 },
-      { x: MX * 1.25, y: MY - 145 },
+      { x: MX * 0.55, y: MY - 50 },
+      { x: MX * 0.65, y: MY - 85 },
+      { x: MX * 0.78, y: MY - 115 },
+      { x: MX * 0.92, y: MY - 138 },
+      { x: MX * 1.08, y: MY - 148 },
+      { x: MX * 1.2, y: MY - 150 },
     ]],
   },
   {
@@ -84,27 +91,30 @@ export const TRACKS: readonly TrackDef[] = [
     color: '#704080',
     terminating: false,
     segments: [[
-      { x: MX * 0.1, y: MY + 245 },
-      { x: MX * 0.3, y: MY + 195 },
-      { x: MX * 0.55, y: MY + 135 },
-      { x: MX * 0.8, y: MY + 85 },
-      { x: MX * 1.1, y: MY + 45 },
-      { x: MX * 1.4, y: MY + 15 },
-      { x: MX * 1.7, y: MY },
-      { x: WORLD.WIDTH, y: MY - 10 },
+      { x: -200, y: MY + 410 },
+      { x: 0, y: MY + 415 },
+      { x: MX * 0.4, y: MY + 405 },
+      { x: MX * 0.8, y: MY + 420 },
+      { x: MX * 1.2, y: MY + 410 },
+      { x: MX * 1.6, y: MY + 405 },
+      { x: WORLD.WIDTH, y: MY + 415 },
+      { x: WORLD.WIDTH + 200, y: MY + 410 },
     ]],
   },
   {
     id: 5,
-    color: '#3080a0',
+    color: '#2080a0',
     terminating: false,
+    electrified: true,
     segments: [[
+      { x: -200, y: MY - 205 },
       { x: 0, y: MY - 210 },
       { x: MX * 0.4, y: MY - 220 },
       { x: MX * 0.8, y: MY - 200 },
       { x: MX * 1.2, y: MY - 215 },
       { x: MX * 1.6, y: MY - 225 },
       { x: WORLD.WIDTH, y: MY - 210 },
+      { x: WORLD.WIDTH + 200, y: MY - 215 },
     ]],
   },
 ];
@@ -185,21 +195,46 @@ export const TRAINS: readonly TrainDef[] = [
   {
     id: 5,
     trackId: 5,
-    numCars: 5,
-    bodyColor: '#f0f0f0',
-    stripeColor: '#c02020',
-    maxSpeed: 0.7,
-    acceleration: 0.002,
-    deceleration: 0.003,
+    numCars: 6,
+    bodyColor: '#e8e8f0',
+    stripeColor: '#1868a8',
+    maxSpeed: 1.2,
+    acceleration: 0.004,
+    deceleration: 0.005,
     direction: 1,
     initialProgress: 0.9,
-    bodyW: 72,
-    bodyH: 36,
+    bodyW: 85,
+    bodyH: 32,
+    electric: true,
   },
 ];
 
 export const PLATFORMS: readonly PlatformDef[] = [
-  { x: MX * 1.08, y: MY - 120, w: 160, h: 30, angle: -0.1 },
+  { x: MX * 1.08, y: MY - 105, w: 480, h: 58, angle: -0.08 },
 ];
 
 export const SIGNAL_PROGRESS = 0.62;
+
+export const PASSENGER_COLORS = [
+  '#e8c8a0', '#d4a574', '#c49060', '#f0d8b8',
+  '#a08060', '#f5e0c8', '#deb898', '#c8a888',
+] as const;
+
+export const PASSENGER_HAT_COLORS = [
+  '#2a4a8a', '#8a2a2a', '#2a8a3a', '#8a6a2a',
+  '#4a2a6a', '#6a6a6a', '#1a1a4a', '#8a4a2a',
+] as const;
+
+export const PASSENGER_SHIRT_COLORS = [
+  '#4488cc', '#cc4444', '#44aa44', '#cc8844',
+  '#8844cc', '#888888', '#2266aa', '#aa4488',
+  '#ffffff', '#333333', '#ffcc00', '#ff6600',
+] as const;
+
+export const TRAIN_NAMES = [
+  'EXPRESS', 'FREIGHT', 'LOCAL', 'SHUNTER', 'SPUR', 'BULLET',
+] as const;
+
+export const TRAIN_DESTINATIONS = [
+  'CENTRAL', 'NORTHGATE', 'HARBOUR', 'WESTEND', 'AIRPORT', 'EASTPARK',
+] as const;
