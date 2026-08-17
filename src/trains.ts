@@ -444,8 +444,8 @@ function updateTrainPhysics(train: TrainState) {
     case 'cruising': {
       train.currentSpeed = Math.min(def.maxSpeed, train.currentSpeed + def.acceleration);
       if (def.stopProgress !== undefined) {
-        const distToStop = def.stopProgress - train.progress;
-        if (distToStop > 0 && distToStop <= 0.08) {
+        const distToStop = (def.stopProgress - train.progress) * dir;
+        if (distToStop > 0 && distToStop <= 0.25) {
           train.phase = 'slowing';
         }
       }
@@ -454,7 +454,7 @@ function updateTrainPhysics(train: TrainState) {
     }
 
     case 'slowing': {
-      const distToStop = def.stopProgress! - train.progress;
+      const distToStop = (def.stopProgress! - train.progress) * dir;
       if (distToStop <= 0.001) {
         train.progress = def.stopProgress!;
         train.currentSpeed = 0;
